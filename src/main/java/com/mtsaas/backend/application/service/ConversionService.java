@@ -254,6 +254,9 @@ public class ConversionService {
             conversion.setStatus(Conversion.Status.FAILED);
             conversion.setErrorMessage(e.getMessage());
             saveConversionLog(conversion);
+            throw e;
+        }
+    }
     public java.util.Map<String, Object> validateMtMessage(String mtContent, String messageType) {
         java.util.Map<String, Object> result = new java.util.HashMap<>();
         try {
