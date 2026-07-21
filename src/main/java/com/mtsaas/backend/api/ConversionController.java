@@ -33,7 +33,7 @@ public class ConversionController {
         } catch (RuntimeException e) {
             if ("ANONYMOUS_LIMIT_REACHED".equals(e.getMessage())) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(Map.of("error", "Anonymous limit reached. Sign up to get 5 more free credits!", "code",
+                        .body(Map.of("error", "Guest trial limit reached. Sign up to get 10 free credits.", "code",
                                 "ANONYMOUS_LIMIT_REACHED"));
             }
             if ("INSUFFICIENT_CREDITS".equals(e.getMessage())
@@ -70,7 +70,7 @@ public class ConversionController {
         } catch (RuntimeException e) {
             if ("ANONYMOUS_LIMIT_REACHED".equals(e.getMessage())) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(Map.of("error", "Anonymous limit reached. Sign up to get 5 more free credits!", "code",
+                        .body(Map.of("error", "Guest trial limit reached. Sign up to get 10 free credits.", "code",
                                 "ANONYMOUS_LIMIT_REACHED"));
             }
             if ("INSUFFICIENT_CREDITS".equals(e.getMessage())
@@ -90,5 +90,16 @@ public class ConversionController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Internal server error during conversion"));
         }
+    }
+
+    @PostMapping("/validate")
+    public ResponseEntity<Map<String, Object>> validateMtMessage(@RequestBody Map<String, String> request) {
+        String mtContent = request.get("mtMessage");
+        if (mtContent == null || mtContent.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("valid", false, "errors", java.util.List.of("MT message content is required")));
+        }
+        String messageType = request.get("messageType");
+        Map<String, Object> validationResult = conversionService.validateMtMessage(mtContent, messageType);
+        return ResponseEntity.ok(validationResult);
     }
 }

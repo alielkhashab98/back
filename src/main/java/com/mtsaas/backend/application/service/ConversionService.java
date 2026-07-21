@@ -93,7 +93,7 @@ public class ConversionService {
                 // Anonymous user check
                 long anonymousCount = conversionRepository.countByIpAddressAndUserIsNull(ipAddress);
                 log.info("Anonymous conversion count for IP {}: {}", ipAddress, anonymousCount);
-                if (anonymousCount >= 1) {
+                if (anonymousCount >= TrialLimitPolicy.GUEST_FREE_CONVERSIONS) {
                     log.warn("Anonymous limit reached for IP: {}", ipAddress);
                     throw new RuntimeException("ANONYMOUS_LIMIT_REACHED");
                 }
@@ -202,7 +202,7 @@ public class ConversionService {
             if (user == null) {
                 long anonymousCount = conversionRepository.countByIpAddressAndUserIsNull(ipAddress);
                 log.info("Anonymous conversion count for IP {}: {}", ipAddress, anonymousCount);
-                if (anonymousCount >= 1) {
+                if (anonymousCount >= TrialLimitPolicy.GUEST_FREE_CONVERSIONS) {
                     log.warn("Anonymous limit reached for IP: {}", ipAddress);
                     throw new RuntimeException("ANONYMOUS_LIMIT_REACHED");
                 }
@@ -254,7 +254,46 @@ public class ConversionService {
             conversion.setStatus(Conversion.Status.FAILED);
             conversion.setErrorMessage(e.getMessage());
             saveConversionLog(conversion);
-            throw e;
+    public java.util.Map<String, Object> validateMtMessage(String mtContent, String messageType) {
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+        try {
+            var mtMessage = mtParser.parse(mtContent);
+            if (messageType != null && !messageType.isBlank()) {
+                String typeCode = messageType.toUpperCase().startsWith("MT") ? messageType.substring(2) : messageType;
+                mtMessage.setType(typeCode);
+            }
+
+            String targetType = mtMessage.getType() != null ? mtMessage.getType() : "103";
+            List<String> errors;
+
+            switch (targetType) {
+                case "202COV":
+                case "202_COV":
+                    errors = com.mtsaas.backend.domain.CbprValidator.validatePacs009Cov(mtMessage);
+                    break;
+                case "202":
+                    errors = com.mtsaas.backend.domain.CbprValidator.validatePacs009(mtMessage);
+                    break;
+                case "102":
+                    errors = com.mtsaas.backend.domain.CbprValidator.validatePacs008Bulk(mtMessage);
+                    break;
+                case "103":
+                default:
+                    errors = com.mtsaas.backend.domain.CbprValidator.validatePacs008(mtMessage);
+                    break;
+            }
+
+            result.put("valid", errors.isEmpty());
+            result.put("messageType", "MT" + targetType);
+            result.put("errors", errors);
+            result.put("detectedTags", mtMessage.getTags() != null ? mtMessage.getTags() : java.util.Collections.emptyMap());
+            return result;
+        } catch (Exception e) {
+            result.put("valid", false);
+            result.put("messageType", messageType != null ? messageType : "UNKNOWN");
+            result.put("errors", java.util.List.of("Syntax error parsing SWIFT FIN structure: " + e.getMessage()));
+            result.put("detectedTags", java.util.Collections.emptyMap());
+            return result;
         }
     }
 }

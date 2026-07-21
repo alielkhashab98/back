@@ -84,7 +84,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
                 user.setProvider(provider != null ? provider.toUpperCase() : "GOOGLE");
                 user.setRole(Role.USER);
                 user.setPasswordHash(""); // No password for OAuth2 users
-                user.setCredits(5); // Give 5 free credits on signup
+                user.setCredits(TrialLimitPolicy.SIGNED_IN_FREE_CREDITS); // Give 10 free credits on signup
                 user.setEmailVerified(true); // OAuth2 emails are verified
                 
                 try {
