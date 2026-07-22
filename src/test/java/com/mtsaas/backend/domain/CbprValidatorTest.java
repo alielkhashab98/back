@@ -17,7 +17,7 @@ class CbprValidatorTest {
     void malformedBlock1HeaderIsRejected() {
         MtMessage message = new MtMessage();
         try {
-            parser.parse("{1:F01BANKBEBBAXXX}");
+            parser.parse("{1:F01BAD}");
         } catch (IllegalArgumentException ex) {
             assertTrue(ex.getMessage().contains("Syntax error in SWIFT Block 1"));
             return;

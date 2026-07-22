@@ -71,7 +71,7 @@ public class Pacs009CovGenerator extends Pacs009Generator {
         String tag33B = tags.get("33B");
         if (tag33B != null && tag33B.length() >= 4) {
             String currency = tag33B.substring(0, 3);
-            String amount = normalizeAmount(tag33B.substring(3).replace(",", ""));
+            String amount = normalizeAmount(tag33B.substring(3));
 
             xml.append("          <InstdAmt Ccy=\"").append(escapeXml(currency)).append("\">")
                     .append(escapeXml(amount)).append("</InstdAmt>\n");

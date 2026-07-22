@@ -171,7 +171,7 @@ public class Mt102Generator extends BaseMxGenerator {
         String amountField = tx.amount;
         if (amountField != null && amountField.length() >= 4) {
             String currency = amountField.substring(0, 3);
-            String amount = normalizeAmount(amountField.substring(3).replace(",", ""));
+            String amount = normalizeAmount(amountField.substring(3));
 
             xml.append("        <IntrBkSttlmAmt Ccy=\"").append(escapeXml(currency)).append("\">")
                     .append(escapeXml(amount)).append("</IntrBkSttlmAmt>\n");

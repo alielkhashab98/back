@@ -224,7 +224,7 @@ public class Camt053Generator extends BaseMxGenerator {
         info.currency = balanceField.substring(7, 10);
 
         // Amount (rest of the string)
-        info.amount = normalizeAmount(balanceField.substring(10).replace(",", ""));
+        info.amount = normalizeAmount(balanceField.substring(10));
 
         return info;
     }
@@ -276,7 +276,7 @@ public class Camt053Generator extends BaseMxGenerator {
                 pos++;
             }
 
-            line.amount = normalizeAmount(amountStr.toString().replace(",", ""));
+            line.amount = normalizeAmount(amountStr.toString());
             line.currency = "USD"; // Default, could be extracted from context
 
         } catch (Exception e) {
