@@ -116,6 +116,19 @@ class ConversionServiceMtToMxTest {
     }
 
     @Test
+    void convertsMt103WithSessionAndSequenceInBlock1() {
+        when(conversionRepository.countByIpAddressAndUserIsNull("203.0.113.25")).thenReturn(0L);
+
+        String xml = service.convertMtToMx(mt103WithSessionAndSequence(), null);
+
+        assertTrue(xml.contains("<MsgDefIdr>pacs.008.001.08</MsgDefIdr>"));
+        assertTrue(xml.contains("<BizMsgIdr>TRANSREF123</BizMsgIdr>"));
+        assertTrue(xml.contains("<IntrBkSttlmAmt Ccy=\"EUR\">125000.50</IntrBkSttlmAmt>"));
+        assertTrue(xml.contains("<Nm>JOHN DOE</Nm>"));
+        assertTrue(xml.contains("<Nm>JANE SMITH</Nm>"));
+    }
+
+    @Test
     void convertsMt202FinancialInstitutionTransferToPacs009() {
         when(conversionRepository.countByIpAddressAndUserIsNull("203.0.113.25")).thenReturn(0L);
 
@@ -279,6 +292,23 @@ class ConversionServiceMtToMxTest {
                 + ":52A:DBTRDEFFXXX\n"
                 + ":57A:INTMDEFFXXX\n"
                 + ":58A:CRDTDEFFXXX\n"
+                + "-}";
+    }
+
+    private String mt103WithSessionAndSequence() {
+        return "{1:F01BANKDEFFAXXX0000000000}{2:I103BANKBEBBAXXXN}{4:\n"
+                + ":20:TRANSREF123\n"
+                + ":23B:CRED\n"
+                + ":32A:260518EUR125000,50\n"
+                + ":50K:/12345678\n"
+                + "JOHN DOE\n"
+                + "123 MAPLE STREET\n"
+                + "LONDON\n"
+                + ":59:/87654321\n"
+                + "JANE SMITH\n"
+                + "456 OAK AVENUE\n"
+                + "BRUSSELS\n"
+                + ":71A:SHA\n"
                 + "-}";
     }
 

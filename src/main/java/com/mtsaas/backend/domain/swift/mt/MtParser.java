@@ -17,7 +17,7 @@ public class MtParser {
     private static final Pattern MT_TYPE_PATTERN = Pattern.compile("\\{2:[OI](\\d{3})");
 
     // Extract Block 1 (Sender BIC): {1:F01BANKDEFFAXXX...}
-    private static final Pattern BLOCK_1_PATTERN = Pattern.compile("\\{1:[A-Z]{1}\\d{2}([A-Z0-9]{12})\\}");
+    private static final Pattern BLOCK_1_PATTERN = Pattern.compile("\\{1:[A-Z]{1}\\d{2}([A-Z0-9]{12})(?:\\d{10})?\\}");
 
     // Extract Block 2 (Receiver BIC): {2:O1030000000000BANKBEBBAXXX...}
     private static final Pattern BLOCK_2_RECV_PATTERN = Pattern.compile("\\{2:[OI]\\d{3}\\d{10}([A-Z0-9]{12})");
