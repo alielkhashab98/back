@@ -122,7 +122,7 @@ public class CbprValidator {
         }
 
         String trimmed = value.trim();
-        if (!trimmed.matches("^\\d{6}[A-Z]{3}[\\d,]+$")) {
+        if (!trimmed.matches("(?i)^\\d{6}[A-Z]{3}[\\d,]+$")) {
             errors.add("Invalid :32A: structure. Expected YYMMDDCCCamount.");
             return;
         }

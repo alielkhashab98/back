@@ -221,7 +221,7 @@ public class Camt053Generator extends BaseMxGenerator {
         info.date = "20" + dateStr.substring(0, 2) + "-" + dateStr.substring(2, 4) + "-" + dateStr.substring(4, 6);
 
         // Currency (3 chars)
-        info.currency = balanceField.substring(7, 10);
+        info.currency = balanceField.substring(7, 10).toUpperCase();
 
         // Amount (rest of the string)
         info.amount = normalizeAmount(balanceField.substring(10));

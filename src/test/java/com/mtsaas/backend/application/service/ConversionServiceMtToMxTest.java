@@ -129,6 +129,19 @@ class ConversionServiceMtToMxTest {
     }
 
     @Test
+    void convertsMt103WhenHeadersAndTagsUseLowercaseLetters() {
+        when(conversionRepository.countByIpAddressAndUserIsNull("203.0.113.25")).thenReturn(0L);
+
+        String xml = service.convertMtToMx(mt103Lowercase(), null);
+
+        assertTrue(xml.contains("<MsgDefIdr>pacs.008.001.08</MsgDefIdr>"));
+        assertTrue(xml.contains("<BizMsgIdr>lowerref123</BizMsgIdr>"));
+        assertTrue(xml.contains("<IntrBkSttlmAmt Ccy=\"EUR\">125000.50</IntrBkSttlmAmt>"));
+        assertTrue(xml.contains("<ChrgBr>SHAR</ChrgBr>"));
+        assertTrue(xml.contains("<BICFI>BANKDEFFXXX</BICFI>"));
+    }
+
+    @Test
     void convertsMt202FinancialInstitutionTransferToPacs009() {
         when(conversionRepository.countByIpAddressAndUserIsNull("203.0.113.25")).thenReturn(0L);
 
@@ -309,6 +322,23 @@ class ConversionServiceMtToMxTest {
                 + "456 OAK AVENUE\n"
                 + "BRUSSELS\n"
                 + ":71A:SHA\n"
+                + "-}";
+    }
+
+    private String mt103Lowercase() {
+        return "{1:f01bankdeffaxxx0000000000}{2:i103bankbebbaxxxn}{4:\n"
+                + ":20:lowerref123\n"
+                + ":23b:cred\n"
+                + ":32a:260518eur125000,50\n"
+                + ":50k:/12345678\n"
+                + "john doe\n"
+                + "123 maple street\n"
+                + "london\n"
+                + ":59:/87654321\n"
+                + "jane smith\n"
+                + "456 oak avenue\n"
+                + "brussels\n"
+                + ":71a:sha\n"
                 + "-}";
     }
 

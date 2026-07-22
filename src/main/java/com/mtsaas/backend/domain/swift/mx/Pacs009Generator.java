@@ -155,7 +155,7 @@ public class Pacs009Generator extends BaseMxGenerator {
         String field32A = tags.get("32A");
         if (field32A != null && field32A.length() >= 9) {
             String dateRaw = field32A.substring(0, 6);
-            String ccy = field32A.substring(6, 9);
+            String ccy = field32A.substring(6, 9).toUpperCase();
             String amount = extractAmount(field32A);
 
             String isoDate = "20" + dateRaw.substring(0, 2) + "-" +

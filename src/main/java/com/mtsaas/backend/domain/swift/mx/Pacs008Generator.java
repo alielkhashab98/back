@@ -162,7 +162,7 @@ public class Pacs008Generator extends BaseMxGenerator {
         String f33B = tags.get("33B");
         if (field32A != null && field32A.length() >= 9) {
             String dateRaw = field32A.substring(0, 6);
-            String ccy = field32A.substring(6, 9);
+            String ccy = field32A.substring(6, 9).toUpperCase();
             String amount = extractAmount(field32A);
 
             String isoDate = "20" + dateRaw.substring(0, 2) + "-" +
@@ -174,7 +174,7 @@ public class Pacs008Generator extends BaseMxGenerator {
             xml.append("        <IntrBkSttlmDt>").append(escapeXml(isoDate)).append("</IntrBkSttlmDt>\n");
 
             if (f33B != null && !f33B.isBlank()) {
-                String ccy33 = f33B.length() >= 3 ? f33B.substring(0, 3) : ccy;
+                String ccy33 = f33B.length() >= 3 ? f33B.substring(0, 3).toUpperCase() : ccy;
                 String amt33 = f33B.length() > 3 ? normalizeAmount(f33B.substring(3)) : amount;
                 xml.append("        <InstdAmt Ccy=\"").append(escapeXml(ccy33)).append("\">")
                         .append(escapeXml(amt33)).append("</InstdAmt>\n");

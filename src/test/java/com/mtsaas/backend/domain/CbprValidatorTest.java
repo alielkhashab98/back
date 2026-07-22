@@ -47,4 +47,21 @@ class CbprValidatorTest {
         var errors = CbprValidator.validatePacs008(message);
         assertTrue(errors.stream().anyMatch(error -> error.contains("Invalid value date")));
     }
+
+    @Test
+    void lowercaseCurrencyIn32AIsAccepted() {
+        MtMessage message = new MtMessage();
+        message.setTags(Map.of(
+                "20", "REF001",
+                "32A", "260518eur1000,00",
+                "50K", "/12345678\nJOHN DOE",
+                "59", "/87654321\nJANE SMITH",
+                "71A", "sha"));
+        message.setSender("BANKDEFFXXX");
+        message.setReceiver("BANKBEBBXXX");
+
+        var errors = CbprValidator.validatePacs008(message);
+
+        assertFalse(errors.stream().anyMatch(error -> error.contains(":32A:")));
+    }
 }

@@ -14,16 +14,16 @@ public class MtParser {
     private static final Pattern BLOCK_4_PATTERN = Pattern.compile("\\{4:([\\s\\S]*?)-\\}");
 
     // Extract MT type from block 2: {2:O103...}, {2:O202...}
-    private static final Pattern MT_TYPE_PATTERN = Pattern.compile("\\{2:[OI](\\d{3})");
+    private static final Pattern MT_TYPE_PATTERN = Pattern.compile("\\{2:[OI](\\d{3})", Pattern.CASE_INSENSITIVE);
 
     // Extract Block 1 (Sender BIC): {1:F01BANKDEFFAXXX...}
-    private static final Pattern BLOCK_1_PATTERN = Pattern.compile("\\{1:[A-Z]{1}\\d{2}([A-Z0-9]{12})(?:\\d{10})?\\}");
+    private static final Pattern BLOCK_1_PATTERN = Pattern.compile("\\{1:[A-Z]{1}\\d{2}([A-Z0-9]{12})(?:\\d{10})?\\}", Pattern.CASE_INSENSITIVE);
 
     // Extract Block 2 (Receiver BIC): {2:O1030000000000BANKBEBBAXXX...}
-    private static final Pattern BLOCK_2_RECV_PATTERN = Pattern.compile("\\{2:[OI]\\d{3}\\d{10}([A-Z0-9]{12})");
+    private static final Pattern BLOCK_2_RECV_PATTERN = Pattern.compile("\\{2:[OI]\\d{3}\\d{10}([A-Z0-9]{12})", Pattern.CASE_INSENSITIVE);
     // Fallback for short/non-standard Block 2 forms like: {2:1103PNBPUS3NXNYCN}
     private static final Pattern BLOCK_2_CONTENT_PATTERN = Pattern.compile("\\{2:([^}]*)\\}");
-    private static final Pattern BIC_11_PATTERN = Pattern.compile("[A-Z]{6}[A-Z0-9]{2}[A-Z0-9]{3}");
+    private static final Pattern BIC_11_PATTERN = Pattern.compile("[A-Z]{6}[A-Z0-9]{2}[A-Z0-9]{3}", Pattern.CASE_INSENSITIVE);
 
     // Extract Block 3 (User Header) fields: {3:{121:uuid}...}
     // Updated regex to handle nested braces correctly
@@ -52,7 +52,7 @@ public class MtParser {
             String baseType = mtTypeMatcher.group(1); // e.g., "103", "202"
 
             // Check for COV indicator in Block 3 for MT202COV
-            if ("202".equals(baseType) && content.contains("{119:COV}")) {
+            if ("202".equals(baseType) && content.toUpperCase().contains("{119:COV}")) {
                 message.setType("202COV");
             } else {
                 message.setType(baseType);
@@ -66,7 +66,7 @@ public class MtParser {
         // --- Extract Sender BIC from block 1 ---
         Matcher senderMatcher = BLOCK_1_PATTERN.matcher(content);
         if (senderMatcher.find()) {
-            String fullBic = senderMatcher.group(1);
+            String fullBic = senderMatcher.group(1).toUpperCase();
             // SWIFT BICs in Block 1 are 12 chars: BANK(4)+CO(2)+L(2)+FILLER(1)+BRN(3)
             // Strip the 9th character (index 8) if it's 12 chars long.
             if (fullBic.length() == 12) {
@@ -78,7 +78,7 @@ public class MtParser {
         // --- Extract Receiver BIC from block 2 ---
         Matcher receiverMatcher = BLOCK_2_RECV_PATTERN.matcher(content);
         if (receiverMatcher.find()) {
-            String fullBic = receiverMatcher.group(1);
+            String fullBic = receiverMatcher.group(1).toUpperCase();
             if (fullBic.length() == 12) {
                 fullBic = fullBic.substring(0, 8) + fullBic.substring(9);
             }
@@ -115,7 +115,7 @@ public class MtParser {
             return message;
         }
 
-        Pattern tokenPattern = Pattern.compile("(?<!\\S):([0-9]{2}[A-Z]?):");
+        Pattern tokenPattern = Pattern.compile("(?<!\\S):([0-9]{2}[A-Z]?):", Pattern.CASE_INSENSITIVE);
         Matcher tokenMatcher = tokenPattern.matcher(block4);
 
         int lastMatchEnd = -1;
@@ -126,7 +126,7 @@ public class MtParser {
                 String value = block4.substring(lastMatchEnd, tokenMatcher.start()).trim();
                 tags.put(lastTag, cleanTagValue(lastTag, value));
             }
-            lastTag = tokenMatcher.group(1);
+            lastTag = tokenMatcher.group(1).toUpperCase();
             lastMatchEnd = tokenMatcher.end();
         }
 
