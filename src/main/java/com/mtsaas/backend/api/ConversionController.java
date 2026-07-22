@@ -100,6 +100,10 @@ public class ConversionController {
         }
         String messageType = request.get("messageType");
         Map<String, Object> validationResult = conversionService.validateMtMessage(mtContent, messageType);
-        return ResponseEntity.ok(validationResult);
+        boolean valid = Boolean.TRUE.equals(validationResult.get("valid"));
+        if (valid) {
+            return ResponseEntity.ok(validationResult);
+        }
+        return ResponseEntity.unprocessableEntity().body(validationResult);
     }
 }

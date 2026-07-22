@@ -1,6 +1,8 @@
 package com.mtsaas.backend.domain;
 
 import com.mtsaas.backend.domain.swift.mt.MtMessage;
+import java.time.DateTimeException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -99,7 +101,52 @@ public class CbprValidator {
 
     private static void checkTag(Map<String, String> tags, String key, String label, List<String> errors) {
         if (!tags.containsKey(key) || tags.get(key).isBlank()) {
-            errors.add("Missing mandatory tag: " + label);
+            if ("32A".equals(key)) {
+                errors.add("Missing mandatory field :32A: Amount/Currency.");
+            } else {
+                errors.add("Missing mandatory tag: " + label);
+            }
+            return;
+        }
+
+        if ("32A".equals(key)) {
+            validate32ATag(tags.get(key), errors);
+        }
+    }
+
+    private static void validate32ATag(String value, List<String> errors) {
+        if (value == null || value.isBlank()) {
+            errors.add("Missing mandatory field :32A: Amount/Currency.");
+            return;
+        }
+
+        String trimmed = value.trim();
+        if (!trimmed.matches("^\\d{6}[A-Z]{3}\\d[\\d,\\.]+$")) {
+            errors.add("Missing mandatory field :32A: Amount/Currency.");
+            return;
+        }
+
+        String datePart = trimmed.substring(0, 6);
+        if (!isValidDate(datePart)) {
+            errors.add("Invalid value date in :32A:.");
+        }
+    }
+
+    private static boolean isValidDate(String datePart) {
+        if (datePart == null || !datePart.matches("\\d{6}")) {
+            return false;
+        }
+
+        int day = Integer.parseInt(datePart.substring(4, 6));
+        int month = Integer.parseInt(datePart.substring(2, 4));
+        int year = Integer.parseInt(datePart.substring(0, 2));
+        int fullYear = year < 70 ? 2000 + year : 1900 + year;
+
+        try {
+            LocalDate.of(fullYear, month, day);
+            return true;
+        } catch (DateTimeException e) {
+            return false;
         }
     }
 

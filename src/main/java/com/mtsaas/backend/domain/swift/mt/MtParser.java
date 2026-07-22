@@ -44,6 +44,8 @@ public class MtParser {
             return message;
         }
 
+        validateBlock1Syntax(content);
+
         // --- Extract MT type from block 2 ---
         Matcher mtTypeMatcher = MT_TYPE_PATTERN.matcher(content);
         if (mtTypeMatcher.find()) {
@@ -146,6 +148,27 @@ public class MtParser {
         }
 
         return message;
+    }
+
+    private void validateBlock1Syntax(String content) {
+        if (content == null || content.isBlank()) {
+            throw new IllegalArgumentException("Invalid SWIFT Block 1 syntax structure.");
+        }
+
+        int block1Start = content.indexOf("{1:");
+        if (block1Start < 0) {
+            throw new IllegalArgumentException("Invalid SWIFT Block 1 syntax structure.");
+        }
+
+        int block1End = content.indexOf('}', block1Start + 3);
+        if (block1End < 0) {
+            throw new IllegalArgumentException("Invalid SWIFT Block 1 syntax structure.");
+        }
+
+        String block1 = content.substring(block1Start, block1End + 1);
+        if (!BLOCK_1_PATTERN.matcher(block1).matches()) {
+            throw new IllegalArgumentException("Invalid SWIFT Block 1 syntax structure.");
+        }
     }
 
     private java.util.Optional<String> extractReceiverFromFlexibleBlock2(String content) {
