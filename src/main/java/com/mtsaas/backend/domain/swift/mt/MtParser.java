@@ -152,22 +152,22 @@ public class MtParser {
 
     private void validateBlock1Syntax(String content) {
         if (content == null || content.isBlank()) {
-            throw new IllegalArgumentException("Invalid SWIFT Block 1 syntax structure.");
+            throw new IllegalArgumentException("Syntax error in SWIFT Block 1: message content is empty.");
         }
 
         int block1Start = content.indexOf("{1:");
         if (block1Start < 0) {
-            throw new IllegalArgumentException("Invalid SWIFT Block 1 syntax structure.");
+            throw new IllegalArgumentException("Syntax error in SWIFT Block 1: missing {1: block.");
         }
 
         int block1End = content.indexOf('}', block1Start + 3);
         if (block1End < 0) {
-            throw new IllegalArgumentException("Invalid SWIFT Block 1 syntax structure.");
+            throw new IllegalArgumentException("Syntax error in SWIFT Block 1: missing closing }.");
         }
 
         String block1 = content.substring(block1Start, block1End + 1);
         if (!BLOCK_1_PATTERN.matcher(block1).matches()) {
-            throw new IllegalArgumentException("Invalid SWIFT Block 1 syntax structure.");
+            throw new IllegalArgumentException("Syntax error in SWIFT Block 1: malformed header at line 1, column " + (block1Start + 1) + ".");
         }
     }
 

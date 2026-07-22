@@ -3,6 +3,7 @@ package com.mtsaas.backend.domain;
 import com.mtsaas.backend.domain.swift.mt.MtMessage;
 import java.time.DateTimeException;
 import java.time.LocalDate;
+import java.time.DayOfWeek;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -121,14 +122,27 @@ public class CbprValidator {
         }
 
         String trimmed = value.trim();
-        if (!trimmed.matches("^\\d{6}[A-Z]{3}\\d[\\d,\\.]+$")) {
-            errors.add("Missing mandatory field :32A: Amount/Currency.");
+        if (!trimmed.matches("^\\d{6}[A-Z]{3}[\\d,]+$")) {
+            errors.add("Invalid :32A: structure. Expected YYMMDDCCCamount.");
             return;
         }
 
         String datePart = trimmed.substring(0, 6);
+        String currencyPart = trimmed.substring(6, 9);
+        String amountPart = trimmed.substring(9);
+
+        if (currencyPart.isBlank() || amountPart.isBlank()) {
+            errors.add("Missing mandatory field :32A: Amount/Currency.");
+            return;
+        }
+
         if (!isValidDate(datePart)) {
             errors.add("Invalid value date in :32A:.");
+            return;
+        }
+
+        if (!isBusinessDay(datePart)) {
+            errors.add("Invalid value date in :32A: - settlement date must be a business day.");
         }
     }
 
@@ -145,6 +159,24 @@ public class CbprValidator {
         try {
             LocalDate.of(fullYear, month, day);
             return true;
+        } catch (DateTimeException e) {
+            return false;
+        }
+    }
+
+    private static boolean isBusinessDay(String datePart) {
+        if (!isValidDate(datePart)) {
+            return false;
+        }
+
+        int day = Integer.parseInt(datePart.substring(4, 6));
+        int month = Integer.parseInt(datePart.substring(2, 4));
+        int year = Integer.parseInt(datePart.substring(0, 2));
+        int fullYear = year < 70 ? 2000 + year : 1900 + year;
+
+        try {
+            DayOfWeek dayOfWeek = LocalDate.of(fullYear, month, day).getDayOfWeek();
+            return dayOfWeek != DayOfWeek.SATURDAY && dayOfWeek != DayOfWeek.SUNDAY;
         } catch (DateTimeException e) {
             return false;
         }

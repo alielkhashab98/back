@@ -19,7 +19,7 @@ class CbprValidatorTest {
         try {
             parser.parse("{1:F01BANKBEBBAXXX}");
         } catch (IllegalArgumentException ex) {
-            assertTrue(ex.getMessage().contains("Invalid SWIFT Block 1 syntax structure"));
+            assertTrue(ex.getMessage().contains("Syntax error in SWIFT Block 1"));
             return;
         }
         throw new AssertionError("Expected malformed Block 1 header to be rejected");
