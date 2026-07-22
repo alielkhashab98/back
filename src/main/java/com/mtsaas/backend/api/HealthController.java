@@ -23,17 +23,15 @@ public class HealthController {
     @GetMapping
     @SuppressWarnings("unused")
     public ResponseEntity<Map<String, String>> health() {
-        // Temporarily commented out DB check to isolate 500 error cause
-        /*
-         * try {
-         * userRepository.count();
-         * } catch (Exception e) {
-         * String errorMessage = e.getMessage() != null ? e.getMessage() :
-         * e.getClass().getSimpleName();
-         * return ResponseEntity.status(503).body(Map.of("status", "DOWN", "error",
-         * errorMessage));
-         * }
-         */
-        return ResponseEntity.ok(Map.of("status", "UP", "note", "Database check temporarily disabled for diagnostics"));
+        try {
+            // Wake up database by executing a simple count query
+            userRepository.count();
+            return ResponseEntity.ok(Map.of("status", "UP", "database", "connected"));
+        } catch (Exception e) {
+            String errorMessage = e.getMessage() != null ? e.getMessage() :
+                e.getClass().getSimpleName();
+            return ResponseEntity.status(503).body(Map.of("status", "DOWN", "error",
+                errorMessage));
+        }
     }
 }
