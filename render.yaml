@@ -2,7 +2,6 @@ services:
   - type: web
     name: swift-mtsaas-backend
     runtime: docker
-    rootDir: backend
     plan: free
     region: ohio
     autoDeploy: true
