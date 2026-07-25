@@ -193,7 +193,6 @@ public abstract class BaseMxGenerator implements MxGenerator {
             // Priority: Regex-extracted BIC (for A, D, F variants)
             String bic = sanitizeBic(parsed.getBic());
             xml.append("            <BICFI>").append(escapeXml(bic)).append("</BICFI>\n");
-            xml.append("            <Nm>").append(escapeXml(bic)).append("</Nm>\n");
         } else {
             String name = parsed.getName();
             if (name == null || name.isBlank()) {
