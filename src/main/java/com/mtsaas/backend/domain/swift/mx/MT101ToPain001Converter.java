@@ -5,13 +5,15 @@ import com.mtsaas.backend.domain.swift.mt.MtParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * Service class that translates legacy SWIFT MT101 payment initiation instructions
- * into ISO 20022 pain.001.001.09 XML payloads.
+ * into ISO 20022 pain.001.001.09 XML payloads in strict accordance with XSD sequence rules.
  */
 @Service
 public class MT101ToPain001Converter extends BaseMxGenerator {
@@ -34,8 +36,6 @@ public class MT101ToPain001Converter extends BaseMxGenerator {
 
     /**
      * Converts a parsed MtMessage into a pain.001.001.09 XML payload.
-     * Note: When using this method, multi-instruction validation may not be reliable
-     * as duplicate tags (e.g. multiple :21:) are overwritten during map-based parsing.
      *
      * @param mtMessage the parsed MT101 message
      * @return the generated ISO 20022 XML
@@ -47,7 +47,7 @@ public class MT101ToPain001Converter extends BaseMxGenerator {
     private void validateInstructionCount(String rawMt101) {
         if (rawMt101 == null) return;
         
-        // Sequence B in MT101 contains the actual transfer instructions.
+        // Sequence B in MT101 contains transfer instructions.
         // Each instruction starts with tag :21: (Transaction Reference).
         Matcher matcher = Pattern.compile("(?m)^:21:").matcher(rawMt101);
         int count = 0;
@@ -55,7 +55,6 @@ public class MT101ToPain001Converter extends BaseMxGenerator {
             count++;
         }
         
-        // If there are multiple instructions, throw a compliance warning/error.
         if (count > 1) {
             throw new IllegalStateException("Compliance Error: Multi-instruction MT101s are not supported. " +
                     "They must be refactored or handled via contingency protocols. Found " + count + " instructions.");
@@ -94,42 +93,55 @@ public class MT101ToPain001Converter extends BaseMxGenerator {
         Map<String, String> tags = mtMessage.getTags();
         StringBuilder xml = new StringBuilder();
 
-        // Use tag 20 (Sender's Reference) for MsgId. If missing, generate a generic one.
         String msgId = tags.getOrDefault("20", "UNKNOWN_MSG_ID").trim();
         msgId = escapeXml(sanitizeId(msgId));
 
-        // CR 3014 Guardrail: Programmatically enforce PmtInfId matches MsgId
+        // CR 3014 Guardrail: Enforce PmtInfId matches MsgId
         String pmtInfId = msgId;
+
+        // Dynamic Creation Timestamp
+        String creationDateTime = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC)
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"));
+
+        // Dynamic Requested Execution Date (from Tag 30 YYMMDD/YYYYMMDD or current UTC date)
+        String reqdExctnDt = parseExecutionDate(tags.get("30"));
+
+        // Dynamic Initiating Party Name (from Debtor tag 50 or Sender BIC)
+        String initgPtyName = extractInitiatingPartyName(mtMessage);
 
         xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         xml.append("<Document xmlns=\"urn:iso:std:iso:20022:tech:xsd:pain.001.001.09\">\n");
         xml.append("  <CstmrCdtTrfInitn>\n");
         
-        // --- Group Header ---
+        // --- 1. Group Header (GrpHdr) ---
         xml.append("    <GrpHdr>\n");
         xml.append("      <MsgId>").append(msgId).append("</MsgId>\n");
-        xml.append("      <CreDtTm>2026-07-25T00:00:00Z</CreDtTm>\n"); // Default placeholder
+        xml.append("      <CreDtTm>").append(creationDateTime).append("</CreDtTm>\n");
         xml.append("      <NbOfTxs>1</NbOfTxs>\n");
         xml.append("      <InitgPty>\n");
-        xml.append("        <Nm>INITIATING PARTY</Nm>\n");
+        xml.append("        <Nm>").append(escapeXml(truncate(initgPtyName, MAX_NAME_LEN))).append("</Nm>\n");
         xml.append("      </InitgPty>\n");
         xml.append("    </GrpHdr>\n");
 
-        // --- Payment Information ---
+        // --- 2. Payment Information (PaymentInstruction30 / PmtInf) ---
+        // XSD Order: PmtInfId -> PmtMtd -> ReqdExctnDt -> Dbtr -> DbtrAcct -> DbtrAgt -> CdtTrfTxInf
         xml.append("    <PmtInf>\n");
         xml.append("      <PmtInfId>").append(pmtInfId).append("</PmtInfId>\n");
         xml.append("      <PmtMtd>TRF</PmtMtd>\n");
         xml.append("      <ReqdExctnDt>\n");
-        xml.append("        <Dt>2026-07-25</Dt>\n");
+        xml.append("        <Dt>").append(reqdExctnDt).append("</Dt>\n");
         xml.append("      </ReqdExctnDt>\n");
 
-        // Debtor (Tag 50 series: 50, 50A, 50F, 50G, 50H, 50K)
+        // Debtor (Tag 50 series)
         appendDebtor(xml, tags);
 
-        // --- Credit Transfer Transaction Information ---
+        // Debtor Agent (Mandatory in PaymentInstruction30)
+        appendDebtorAgent(xml, mtMessage);
+
+        // --- 3. Credit Transfer Transaction Information (CreditTransferTransaction34 / CdtTrfTxInf) ---
+        // XSD Order: PmtId -> Amt -> ChrgBr -> CdtrAgt -> Cdtr -> CdtrAcct -> RmtInf
         xml.append("      <CdtTrfTxInf>\n");
         xml.append("        <PmtId>\n");
-        // Often instruction ID is mapped to tag 21 (Transaction Reference for the instruction)
         String instrId = tags.getOrDefault("21", msgId).trim();
         xml.append("          <InstrId>").append(escapeXml(sanitizeId(instrId))).append("</InstrId>\n");
         xml.append("          <EndToEndId>").append(escapeXml(sanitizeId(instrId))).append("</EndToEndId>\n");
@@ -138,8 +150,17 @@ public class MT101ToPain001Converter extends BaseMxGenerator {
         // Amount (Tag 32B)
         appendAmount(xml, tags);
 
-        // Creditor (Tag 59 series)
+        // Charge Bearer (Tag 71A if present)
+        appendChargeBearer(xml, tags);
+
+        // Creditor Agent (Tag 57A if present)
+        appendAgent(xml, "CdtrAgt", "CdtrAgtAcct", tags, "57");
+
+        // Creditor & Creditor Account (Tag 59 series)
         appendCreditor(xml, tags);
+
+        // Remittance Info (Tag 70 if present)
+        appendRemittanceInfo(xml, tags);
 
         xml.append("      </CdtTrfTxInf>\n");
         xml.append("    </PmtInf>\n");
@@ -160,7 +181,6 @@ public class MT101ToPain001Converter extends BaseMxGenerator {
         }
 
         if (content == null) {
-            // Fallback empty
             xml.append("      <Dbtr>\n        <Nm>UNKNOWN DEBTOR</Nm>\n      </Dbtr>\n");
             return;
         }
@@ -169,22 +189,7 @@ public class MT101ToPain001Converter extends BaseMxGenerator {
         
         xml.append("      <Dbtr>\n");
         xml.append("        <Nm>").append(escapeXml(truncate(extractName(parsed.getName()), MAX_NAME_LEN))).append("</Nm>\n");
-        
-        boolean hasAddress = !parsed.getAddressLines().isEmpty() || (parsed.getCountry() != null && !parsed.getCountry().isBlank());
-        if (hasAddress) {
-            xml.append("        <PstlAdr>\n");
-            if (parsed.getCountry() != null && !parsed.getCountry().isBlank()) {
-                xml.append("          <Ctry>").append(escapeXml(parsed.getCountry())).append("</Ctry>\n");
-            }
-            if (!parsed.getAddressLines().isEmpty()) {
-                String townName = parsed.getAddressLines().get(parsed.getAddressLines().size() - 1);
-                xml.append("          <TwnNm>").append(escapeXml(truncate(townName, 35))).append("</TwnNm>\n");
-                for (int i = 0; i < parsed.getAddressLines().size() - 1; i++) {
-                    xml.append("          <AdrLine>").append(escapeXml(truncate(parsed.getAddressLines().get(i), MAX_ADR_LINE_LEN))).append("</AdrLine>\n");
-                }
-            }
-            xml.append("        </PstlAdr>\n");
-        }
+        appendPstlAdr(xml, "        ", parsed.getAddressLines(), parsed.getCountry());
         xml.append("      </Dbtr>\n");
 
         if (parsed.getAccount() != null && !parsed.getAccount().isBlank()) {
@@ -201,6 +206,26 @@ public class MT101ToPain001Converter extends BaseMxGenerator {
             xml.append("        </Id>\n");
             xml.append("      </DbtrAcct>\n");
         }
+    }
+
+    private void appendDebtorAgent(StringBuilder xml, MtMessage mtMessage) {
+        Map<String, String> tags = mtMessage.getTags();
+        String bic = null;
+        if (tags.containsKey("51A")) {
+            bic = tags.get("51A");
+        } else if (tags.containsKey("52A")) {
+            bic = tags.get("52A");
+        } else if (mtMessage.getSender() != null && !mtMessage.getSender().isBlank()) {
+            bic = mtMessage.getSender();
+        }
+
+        String cleanBic = sanitizeBic(bic);
+
+        xml.append("      <DbtrAgt>\n");
+        xml.append("        <FinInstnId>\n");
+        xml.append("          <BICFI>").append(escapeXml(cleanBic)).append("</BICFI>\n");
+        xml.append("        </FinInstnId>\n");
+        xml.append("      </DbtrAgt>\n");
     }
 
     private void appendCreditor(StringBuilder xml, Map<String, String> tags) {
@@ -222,48 +247,59 @@ public class MT101ToPain001Converter extends BaseMxGenerator {
 
         xml.append("        <Cdtr>\n");
         xml.append("          <Nm>").append(escapeXml(truncate(extractName(parsed.getName()), MAX_NAME_LEN))).append("</Nm>\n");
-        
-        // Extract Town Name and Country to dedicated elements for Nov 2026 mandates
-        boolean hasAddress = !parsed.getAddressLines().isEmpty() || (parsed.getCountry() != null && !parsed.getCountry().isBlank());
-        if (hasAddress) {
-            xml.append("          <PstlAdr>\n");
-            if (parsed.getCountry() != null && !parsed.getCountry().isBlank()) {
-                xml.append("            <Ctry>").append(escapeXml(parsed.getCountry())).append("</Ctry>\n");
-            }
-            
-            // For structured address mandates, attempt to extract TwnNm if we have address lines
-            if (!parsed.getAddressLines().isEmpty()) {
-                // Usually Town Name is the last line or before country
-                String townName = parsed.getAddressLines().get(parsed.getAddressLines().size() - 1);
-                xml.append("            <TwnNm>").append(escapeXml(truncate(townName, 35))).append("</TwnNm>\n");
-                
-                // Add remaining lines as AdrLine
-                for (int i = 0; i < parsed.getAddressLines().size() - 1; i++) {
-                    xml.append("            <AdrLine>").append(escapeXml(truncate(parsed.getAddressLines().get(i), MAX_ADR_LINE_LEN))).append("</AdrLine>\n");
-                }
-            }
-            xml.append("          </PstlAdr>\n");
-        }
+        appendPstlAdr(xml, "          ", parsed.getAddressLines(), parsed.getCountry());
         xml.append("        </Cdtr>\n");
 
         if (parsed.getAccount() != null && !parsed.getAccount().isBlank()) {
             String cleanAcct = cleanAccount(parsed.getAccount());
             xml.append("        <CdtrAcct>\n");
-            xml.append("        <Id>\n");
+            xml.append("          <Id>\n");
             if (isValidIBAN(cleanAcct)) {
-                xml.append("          <IBAN>").append(escapeXml(cleanAcct)).append("</IBAN>\n");
+                xml.append("            <IBAN>").append(escapeXml(cleanAcct)).append("</IBAN>\n");
             } else {
-                xml.append("          <Othr>\n");
-                xml.append("            <Id>").append(escapeXml(cleanAcct)).append("</Id>\n");
-                xml.append("          </Othr>\n");
+                xml.append("            <Othr>\n");
+                xml.append("              <Id>").append(escapeXml(cleanAcct)).append("</Id>\n");
+                xml.append("            </Othr>\n");
             }
-            xml.append("        </Id>\n");
+            xml.append("          </Id>\n");
             xml.append("        </CdtrAcct>\n");
         }
     }
 
+    /**
+     * Appends PostalAddress24 adhering strictly to XSD sequence rules:
+     * TwnNm (line 819) -> Ctry (line 823) -> AdrLine (line 824).
+     */
+    private void appendPstlAdr(StringBuilder xml, String indent, List<String> addressLines, String country) {
+        if (addressLines.isEmpty() && (country == null || country.isBlank())) {
+            return;
+        }
+
+        xml.append(indent).append("<PstlAdr>\n");
+
+        String townName = null;
+        List<String> adrLines = new ArrayList<>(addressLines);
+
+        if (!adrLines.isEmpty()) {
+            townName = adrLines.remove(adrLines.size() - 1);
+        }
+
+        if (townName != null && !townName.isBlank()) {
+            xml.append(indent).append("  <TwnNm>").append(escapeXml(truncate(townName, 35))).append("</TwnNm>\n");
+        }
+
+        if (country != null && !country.isBlank()) {
+            xml.append(indent).append("  <Ctry>").append(escapeXml(country)).append("</Ctry>\n");
+        }
+
+        for (String adr : adrLines) {
+            xml.append(indent).append("  <AdrLine>").append(escapeXml(truncate(adr, MAX_ADR_LINE_LEN))).append("</AdrLine>\n");
+        }
+
+        xml.append(indent).append("</PstlAdr>\n");
+    }
+
     private void appendAmount(StringBuilder xml, Map<String, String> tags) {
-        // Tag 32B format: Currency (3!a) Amount (15d) e.g., EUR1000,50
         String tag32B = tags.get("32B");
         if (tag32B != null && tag32B.length() >= 3) {
             String ccy = tag32B.substring(0, 3);
@@ -273,10 +309,31 @@ public class MT101ToPain001Converter extends BaseMxGenerator {
             xml.append("          <InstdAmt Ccy=\"").append(escapeXml(ccy)).append("\">").append(amt).append("</InstdAmt>\n");
             xml.append("        </Amt>\n");
         } else {
-            // Fallback
             xml.append("        <Amt>\n");
             xml.append("          <InstdAmt Ccy=\"USD\">0.00</InstdAmt>\n");
             xml.append("        </Amt>\n");
+        }
+    }
+
+    private void appendChargeBearer(StringBuilder xml, Map<String, String> tags) {
+        String tag71A = tags.get("71A");
+        if (tag71A == null || tag71A.isBlank()) return;
+
+        String code = "SHAR";
+        String normalized = tag71A.trim().toUpperCase();
+        if (normalized.startsWith("OUR")) code = "DEBT";
+        else if (normalized.startsWith("BEN")) code = "CRED";
+        else if (normalized.startsWith("SHA")) code = "SHAR";
+
+        xml.append("        <ChrgBr>").append(code).append("</ChrgBr>\n");
+    }
+
+    private void appendRemittanceInfo(StringBuilder xml, Map<String, String> tags) {
+        String tag70 = tags.get("70");
+        if (tag70 != null && !tag70.isBlank()) {
+            xml.append("        <RmtInf>\n");
+            xml.append("          <Ustrd>").append(escapeXml(truncate(tag70, 140))).append("</Ustrd>\n");
+            xml.append("        </RmtInf>\n");
         }
     }
 
@@ -285,6 +342,44 @@ public class MT101ToPain001Converter extends BaseMxGenerator {
         String clean = id.replaceAll("[^a-zA-Z0-9\\-]", "");
         if (clean.isEmpty()) return "UNKNOWN";
         return truncate(clean, MAX_ID_LEN);
+    }
+
+    private String parseExecutionDate(String tag30) {
+        if (tag30 != null && !tag30.isBlank()) {
+            String clean = tag30.trim();
+            // YYMMDD -> 20YY-MM-DD
+            if (clean.length() == 6 && clean.matches("\\d{6}")) {
+                String yy = clean.substring(0, 2);
+                String mm = clean.substring(2, 4);
+                String dd = clean.substring(4, 6);
+                return "20" + yy + "-" + mm + "-" + dd;
+            }
+            // YYYYMMDD -> YYYY-MM-DD
+            if (clean.length() == 8 && clean.matches("\\d{8}")) {
+                String yyyy = clean.substring(0, 4);
+                String mm = clean.substring(4, 6);
+                String dd = clean.substring(6, 8);
+                return yyyy + "-" + mm + "-" + dd;
+            }
+        }
+        return java.time.LocalDate.now(java.time.ZoneOffset.UTC).toString();
+    }
+
+    private String extractInitiatingPartyName(MtMessage mtMessage) {
+        Map<String, String> tags = mtMessage.getTags();
+        String[] variants = {"50", "50A", "50F", "50G", "50H", "50K"};
+        for (String v : variants) {
+            if (tags.containsKey(v)) {
+                ParsedParty party = parsePartyContent(tags.get(v), false);
+                if (party != null && party.getName() != null && !party.getName().isBlank()) {
+                    return party.getName();
+                }
+            }
+        }
+        if (mtMessage.getSender() != null && !mtMessage.getSender().isBlank()) {
+            return mtMessage.getSender();
+        }
+        return "INITIATING PARTY";
     }
 
     @Override
