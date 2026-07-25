@@ -102,6 +102,20 @@ public class CbprValidator {
         return errors;
     }
 
+    public static List<String> validatePain001(MtMessage mtMessage) {
+        List<String> errors = new ArrayList<>();
+        Map<String, String> tags = mtMessage.getTags();
+
+        checkTag(tags, "20", "Sender's Reference (:20:)", errors);
+        checkAnyTag(tags, "50", "Instructing Party / Debtor (:50a:)", errors);
+        checkAnyTag(tags, "59", "Creditor (:59a:)", errors);
+        if (!tags.containsKey("32B")) {
+            errors.add("Missing mandatory tag: Instructed Amount (:32B:)");
+        }
+
+        return errors;
+    }
+
     private static void checkTag(Map<String, String> tags, String key, String label, List<String> errors) {
         if (!tags.containsKey(key) || tags.get(key).isBlank()) {
             if ("32A".equals(key)) {

@@ -270,6 +270,9 @@ public class ConversionService {
             List<String> errors;
 
             switch (targetType) {
+                case "101":
+                    errors = com.mtsaas.backend.domain.CbprValidator.validatePain001(mtMessage);
+                    break;
                 case "202COV":
                 case "202_COV":
                     errors = com.mtsaas.backend.domain.CbprValidator.validatePacs009Cov(mtMessage);
