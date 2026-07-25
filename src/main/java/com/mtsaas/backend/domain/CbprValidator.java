@@ -203,7 +203,7 @@ public class CbprValidator {
         if (tags.containsKey(baseKey))
             found = true;
         else {
-            String[] suffixes = { "A", "B", "D", "F", "K", "C" };
+            String[] suffixes = { "A", "B", "D", "F", "G", "H", "K", "C" };
             for (String s : suffixes) {
                 if (tags.containsKey(baseKey + s)) {
                     found = true;

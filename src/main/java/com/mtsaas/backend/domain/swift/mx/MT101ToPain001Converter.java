@@ -76,10 +76,12 @@ public class MT101ToPain001Converter extends BaseMxGenerator {
         if (!tags.containsKey("20")) {
             throw new IllegalArgumentException("Missing mandatory tag :20: (Sender's Reference)");
         }
-        if (!tags.containsKey("50") && !tags.containsKey("50F") && !tags.containsKey("50G") && !tags.containsKey("50H")) {
+        boolean has50 = tags.keySet().stream().anyMatch(k -> k.equals("50") || k.startsWith("50"));
+        if (!has50) {
             throw new IllegalArgumentException("Missing mandatory tag :50: (Instructing Party / Debtor)");
         }
-        if (!tags.containsKey("59") && !tags.containsKey("59F") && !tags.containsKey("59A")) {
+        boolean has59 = tags.keySet().stream().anyMatch(k -> k.equals("59") || k.startsWith("59"));
+        if (!has59) {
             throw new IllegalArgumentException("Missing mandatory tag :59: (Creditor)");
         }
         if (!tags.containsKey("32B")) {
@@ -121,7 +123,7 @@ public class MT101ToPain001Converter extends BaseMxGenerator {
         xml.append("        <Dt>2026-07-25</Dt>\n");
         xml.append("      </ReqdExctnDt>\n");
 
-        // Debtor (Tag 50 series)
+        // Debtor (Tag 50 series: 50, 50A, 50F, 50G, 50H, 50K)
         appendDebtor(xml, tags);
 
         // --- Credit Transfer Transaction Information ---
@@ -149,7 +151,7 @@ public class MT101ToPain001Converter extends BaseMxGenerator {
 
     private void appendDebtor(StringBuilder xml, Map<String, String> tags) {
         String content = null;
-        String[] variants = {"50", "50F", "50G", "50H"};
+        String[] variants = {"50", "50A", "50F", "50G", "50H", "50K"};
         for (String v : variants) {
             if (tags.containsKey(v)) {
                 content = tags.get(v);
@@ -167,13 +169,19 @@ public class MT101ToPain001Converter extends BaseMxGenerator {
         
         xml.append("      <Dbtr>\n");
         xml.append("        <Nm>").append(escapeXml(truncate(extractName(parsed.getName()), MAX_NAME_LEN))).append("</Nm>\n");
-        if (!parsed.getAddressLines().isEmpty() || (parsed.getCountry() != null && !parsed.getCountry().isBlank())) {
+        
+        boolean hasAddress = !parsed.getAddressLines().isEmpty() || (parsed.getCountry() != null && !parsed.getCountry().isBlank());
+        if (hasAddress) {
             xml.append("        <PstlAdr>\n");
             if (parsed.getCountry() != null && !parsed.getCountry().isBlank()) {
                 xml.append("          <Ctry>").append(escapeXml(parsed.getCountry())).append("</Ctry>\n");
             }
-            for (String adr : parsed.getAddressLines()) {
-                xml.append("          <AdrLine>").append(escapeXml(truncate(adr, MAX_ADR_LINE_LEN))).append("</AdrLine>\n");
+            if (!parsed.getAddressLines().isEmpty()) {
+                String townName = parsed.getAddressLines().get(parsed.getAddressLines().size() - 1);
+                xml.append("          <TwnNm>").append(escapeXml(truncate(townName, 35))).append("</TwnNm>\n");
+                for (int i = 0; i < parsed.getAddressLines().size() - 1; i++) {
+                    xml.append("          <AdrLine>").append(escapeXml(truncate(parsed.getAddressLines().get(i), MAX_ADR_LINE_LEN))).append("</AdrLine>\n");
+                }
             }
             xml.append("        </PstlAdr>\n");
         }
