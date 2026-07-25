@@ -13,21 +13,32 @@ public class MtParser {
     // Extract Block 4 (main message) {4: ... -}
     private static final Pattern BLOCK_4_PATTERN = Pattern.compile("\\{4:([\\s\\S]*?)-\\}");
 
+    // SWIFT generic character set encompassing X, Y, and Z sets (strict ASCII subset).
+    // Disallows things like $, \, |, ^, ~, [, ], and non-ASCII Unicode.
+    private static final Pattern SWIFT_VALID_CHARSET = Pattern.compile("^[a-zA-Z0-9/\\-\\?:().,'+ \\r\\n=!\"%&\\*<>;@_#\\{\\}]*$");
+
     // Extract MT type from block 2: {2:O103...}, {2:O202...}
     private static final Pattern MT_TYPE_PATTERN = Pattern.compile("\\{2:[OI](\\d{3})", Pattern.CASE_INSENSITIVE);
 
     // Extract Block 1 (Sender BIC): {1:F01BANKDEFFAXXX...}
-    // Updated to restrict App ID to F, A, L and Service ID to 01, 21. 
-    // LT address length relaxed to {8,12} to support malformed BICs missing the LT code.
-    private static final Pattern BLOCK_1_PATTERN = Pattern.compile("\\{1:[FAL](?:01|21)([A-Z0-9]{8,12})(?:\\d{10})?\\}", Pattern.CASE_INSENSITIVE);
+    // Updated to restrict App ID to F, A, L and Service ID to 01, 21.
+    // LT address length relaxed to {8,12} to support malformed BICs missing the LT
+    // code.
+    private static final Pattern BLOCK_1_PATTERN = Pattern.compile("\\{1:[FAL](?:01|21)([A-Z0-9]{8,12})(?:\\d{10})?\\}",
+            Pattern.CASE_INSENSITIVE);
 
-    // Extract Receiver BIC from block 2 (Output message format): {2:O1030000000000BANKBEBBAXXX...}
-    private static final Pattern BLOCK_2_OUTPUT_PATTERN = Pattern.compile("\\{2:O\\d{3}\\d{10}([A-Z0-9]{8,12})", Pattern.CASE_INSENSITIVE);
-    // Extract Receiver BIC from block 2 (Input message format): {2:I103BANKDEFFAXXX...}
-    private static final Pattern BLOCK_2_INPUT_PATTERN = Pattern.compile("\\{2:I\\d{3}([A-Z0-9]{8,12})", Pattern.CASE_INSENSITIVE);
+    // Extract Receiver BIC from block 2 (Output message format):
+    // {2:O1030000000000BANKBEBBAXXX...}
+    private static final Pattern BLOCK_2_OUTPUT_PATTERN = Pattern.compile("\\{2:O\\d{3}\\d{10}([A-Z0-9]{8,12})",
+            Pattern.CASE_INSENSITIVE);
+    // Extract Receiver BIC from block 2 (Input message format):
+    // {2:I103BANKDEFFAXXX...}
+    private static final Pattern BLOCK_2_INPUT_PATTERN = Pattern.compile("\\{2:I\\d{3}([A-Z0-9]{8,12})",
+            Pattern.CASE_INSENSITIVE);
     // Fallback for short/non-standard Block 2 forms like: {2:1103PNBPUS3NXNYCN}
     private static final Pattern BLOCK_2_CONTENT_PATTERN = Pattern.compile("\\{2:([^}]*)\\}");
-    private static final Pattern BIC_11_PATTERN = Pattern.compile("[A-Z]{6}[A-Z0-9]{2}[A-Z0-9]{3}", Pattern.CASE_INSENSITIVE);
+    private static final Pattern BIC_11_PATTERN = Pattern.compile("[A-Z]{6}[A-Z0-9]{2}[A-Z0-9]{3}",
+            Pattern.CASE_INSENSITIVE);
 
     // Extract Block 3 (User Header) fields: {3:{121:uuid}...}
     // Updated regex to handle nested braces correctly
@@ -82,7 +93,7 @@ public class MtParser {
         // --- Extract Receiver BIC from block 2 ---
         Matcher outputMatcher = BLOCK_2_OUTPUT_PATTERN.matcher(content);
         Matcher inputMatcher = BLOCK_2_INPUT_PATTERN.matcher(content);
-        
+
         if (outputMatcher.find()) {
             String fullBic = outputMatcher.group(1).toUpperCase();
             if (fullBic.length() == 12) {
@@ -179,7 +190,8 @@ public class MtParser {
 
         String block1 = content.substring(block1Start, block1End + 1);
         if (!BLOCK_1_PATTERN.matcher(block1).matches()) {
-            throw new IllegalArgumentException("Syntax error in SWIFT Block 1: malformed header at line 1, column " + (block1Start + 1) + ".");
+            throw new IllegalArgumentException(
+                    "Syntax error in SWIFT Block 1: malformed header at line 1, column " + (block1Start + 1) + ".");
         }
     }
 
@@ -208,7 +220,8 @@ public class MtParser {
         }
         String value = rawValue;
 
-        int structuralBoundary = findFirstBoundary(value, "{5:", "-}", "<?xml", "<RequestPayload", "{1:", "{2:", "{3:", "{4:");
+        int structuralBoundary = findFirstBoundary(value, "{5:", "-}", "<?xml", "<RequestPayload", "{1:", "{2:", "{3:",
+                "{4:");
         if (structuralBoundary >= 0) {
             value = value.substring(0, structuralBoundary);
         }
@@ -217,7 +230,16 @@ public class MtParser {
         if ("71A".equals(tag)) {
             value = normalizeChargeTag(value);
         }
+        
+        checkInvalidCharacters(tag, value);
+        
         return value;
+    }
+
+    private void checkInvalidCharacters(String tag, String value) {
+        if (value != null && !value.isEmpty() && !SWIFT_VALID_CHARSET.matcher(value).matches()) {
+            System.err.println("MT Message Advisory: Tag :" + tag + ": contains characters outside the standard SWIFT allowed character sets (e.g. invalid symbols or non-ASCII characters).");
+        }
     }
 
     private int findFirstBoundary(String value, String... boundaries) {
