@@ -17,10 +17,14 @@ public class MtParser {
     private static final Pattern MT_TYPE_PATTERN = Pattern.compile("\\{2:[OI](\\d{3})", Pattern.CASE_INSENSITIVE);
 
     // Extract Block 1 (Sender BIC): {1:F01BANKDEFFAXXX...}
-    private static final Pattern BLOCK_1_PATTERN = Pattern.compile("\\{1:[A-Z]{1}\\d{2}([A-Z0-9]{12})(?:\\d{10})?\\}", Pattern.CASE_INSENSITIVE);
+    // Updated to restrict App ID to F, A, L and Service ID to 01, 21. 
+    // LT address length relaxed to {8,12} to support malformed BICs missing the LT code.
+    private static final Pattern BLOCK_1_PATTERN = Pattern.compile("\\{1:[FAL](?:01|21)([A-Z0-9]{8,12})(?:\\d{10})?\\}", Pattern.CASE_INSENSITIVE);
 
-    // Extract Block 2 (Receiver BIC): {2:O1030000000000BANKBEBBAXXX...}
-    private static final Pattern BLOCK_2_RECV_PATTERN = Pattern.compile("\\{2:[OI]\\d{3}\\d{10}([A-Z0-9]{12})", Pattern.CASE_INSENSITIVE);
+    // Extract Receiver BIC from block 2 (Output message format): {2:O1030000000000BANKBEBBAXXX...}
+    private static final Pattern BLOCK_2_OUTPUT_PATTERN = Pattern.compile("\\{2:O\\d{3}\\d{10}([A-Z0-9]{8,12})", Pattern.CASE_INSENSITIVE);
+    // Extract Receiver BIC from block 2 (Input message format): {2:I103BANKDEFFAXXX...}
+    private static final Pattern BLOCK_2_INPUT_PATTERN = Pattern.compile("\\{2:I\\d{3}([A-Z0-9]{8,12})", Pattern.CASE_INSENSITIVE);
     // Fallback for short/non-standard Block 2 forms like: {2:1103PNBPUS3NXNYCN}
     private static final Pattern BLOCK_2_CONTENT_PATTERN = Pattern.compile("\\{2:([^}]*)\\}");
     private static final Pattern BIC_11_PATTERN = Pattern.compile("[A-Z]{6}[A-Z0-9]{2}[A-Z0-9]{3}", Pattern.CASE_INSENSITIVE);
@@ -76,9 +80,17 @@ public class MtParser {
         }
 
         // --- Extract Receiver BIC from block 2 ---
-        Matcher receiverMatcher = BLOCK_2_RECV_PATTERN.matcher(content);
-        if (receiverMatcher.find()) {
-            String fullBic = receiverMatcher.group(1).toUpperCase();
+        Matcher outputMatcher = BLOCK_2_OUTPUT_PATTERN.matcher(content);
+        Matcher inputMatcher = BLOCK_2_INPUT_PATTERN.matcher(content);
+        
+        if (outputMatcher.find()) {
+            String fullBic = outputMatcher.group(1).toUpperCase();
+            if (fullBic.length() == 12) {
+                fullBic = fullBic.substring(0, 8) + fullBic.substring(9);
+            }
+            message.setReceiver(fullBic);
+        } else if (inputMatcher.find()) {
+            String fullBic = inputMatcher.group(1).toUpperCase();
             if (fullBic.length() == 12) {
                 fullBic = fullBic.substring(0, 8) + fullBic.substring(9);
             }
