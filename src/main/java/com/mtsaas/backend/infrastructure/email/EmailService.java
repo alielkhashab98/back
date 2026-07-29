@@ -1,12 +1,9 @@
 package com.mtsaas.backend.infrastructure.email;
 
-import com.sendgrid.Method;
-import com.sendgrid.Request;
-import com.sendgrid.Response;
-import com.sendgrid.SendGrid;
-import com.sendgrid.helpers.mail.Mail;
-import com.sendgrid.helpers.mail.objects.Content;
-import com.sendgrid.helpers.mail.objects.Email;
+import com.resend.Resend;
+import com.resend.core.exception.ResendException;
+import com.resend.services.emails.model.CreateEmailRequest;
+import com.resend.services.emails.model.CreateEmailResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,7 +11,6 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
 import org.springframework.scheduling.annotation.Async;
-import java.io.IOException;
 
 @Service
 @Lazy
@@ -22,10 +18,10 @@ import java.io.IOException;
 @Slf4j
 public class EmailService {
 
-    private final SendGrid sendGrid;
+    private final Resend resend;
     private final FallbackEmailService fallbackEmailService;
 
-    @Value("${sendgrid.from.email:support@swiftmxbridge.com}")
+    @Value("${resend.from.email:support@swiftmxbridge.com}")
     private String senderEmail;
 
     @Value("${app.support.email:support@swiftmxbridge.com}")
@@ -33,17 +29,17 @@ public class EmailService {
 
     @PostConstruct
     public void init() {
-        log.info("✓ EmailService initialized using SendGrid API - Sender Email: {}, Support Email: {}",
+        log.info("✓ EmailService initialized using Resend API - Sender Email: {}, Support Email: {}",
                 senderEmail, supportEmail);
 
         // Validate configuration
         if (senderEmail == null || senderEmail.isEmpty()) {
-            log.warn("⚠ sendgrid.from.email is not configured (SENDGRID_FROM_EMAIL in .env)");
+            log.warn("⚠ resend.from.email is not configured (RESEND_FROM_EMAIL in .env)");
         }
         if (supportEmail == null || supportEmail.isEmpty()) {
             log.warn("⚠ SUPPORT_EMAIL is not configured");
         }
-        log.info("Email configuration loaded from properties for SendGrid");
+        log.info("Email configuration loaded from properties for Resend");
     }
 
     private void sendEmail(String to, String subject, String htmlContent) {
@@ -54,29 +50,19 @@ public class EmailService {
             return;
         }
 
-        Email from = new Email(senderEmail, "Swift MX Bridge");
-        Email recipient = new Email(to);
-        Content content = new Content("text/html", htmlContent);
-        Mail mail = new Mail(from, subject, recipient, content);
+        CreateEmailRequest request = CreateEmailRequest.builder()
+                .from(senderEmail)
+                .to(to)
+                .subject(subject)
+                .html(htmlContent)
+                .build();
 
-        Request request = new Request();
         try {
-            request.setMethod(Method.POST);
-            request.setEndpoint("mail/send");
-            request.setBody(mail.build());
-            Response response = sendGrid.api(request);
-
-            if (response.getStatusCode() >= 200 && response.getStatusCode() < 300) {
-                log.info("✓ Email sent successfully to {}. Status: {}", to, response.getStatusCode());
-            } else {
-                log.error("❌ SendGrid Error for {}: Status: {}, Body: {}", to, response.getStatusCode(),
-                        response.getBody());
-                throw new RuntimeException(
-                        "SendGrid API error: " + response.getStatusCode() + " - " + response.getBody());
-            }
-        } catch (IOException ex) {
-            log.error("❌ SendGrid IOException for {}: {}", to, ex.getMessage());
-            throw new RuntimeException("SendGrid IO error", ex);
+            CreateEmailResponse response = resend.emails().send(request);
+            log.info("✓ Email sent successfully to {}. ID: {}", to, response.getId());
+        } catch (ResendException ex) {
+            log.error("❌ Resend Error for {}: {}", to, ex.getMessage());
+            throw new RuntimeException("Resend API error", ex);
         }
     }
 

@@ -1,18 +1,18 @@
 package com.mtsaas.backend.infrastructure.email;
 
-import com.sendgrid.SendGrid;
+import com.resend.Resend;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-public class SendGridConfig {
+public class ResendConfig {
 
-    @Value("${sendgrid.api.key}")
+    @Value("${resend.api.key}")
     private String apiKey;
 
     @Bean
-    public SendGrid sendGrid() {
-        return new SendGrid(apiKey);
+    public Resend resend() {
+        return new Resend(apiKey);
     }
 }
