@@ -2,7 +2,7 @@ package com.mtsaas.backend.infrastructure.email;
 
 import com.resend.Resend;
 import com.resend.core.exception.ResendException;
-import com.resend.services.emails.model.CreateEmailRequest;
+import com.resend.services.emails.model.CreateEmailOptions;
 import com.resend.services.emails.model.CreateEmailResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,7 +50,7 @@ public class EmailService {
             return;
         }
 
-        CreateEmailRequest request = CreateEmailRequest.builder()
+        CreateEmailOptions params = CreateEmailOptions.builder()
                 .from(senderEmail)
                 .to(to)
                 .subject(subject)
@@ -58,7 +58,7 @@ public class EmailService {
                 .build();
 
         try {
-            CreateEmailResponse response = resend.emails().send(request);
+            CreateEmailResponse response = resend.emails().send(params);
             log.info("✓ Email sent successfully to {}. ID: {}", to, response.getId());
         } catch (ResendException ex) {
             log.error("❌ Resend Error for {}: {}", to, ex.getMessage());
