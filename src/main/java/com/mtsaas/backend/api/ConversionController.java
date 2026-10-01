@@ -19,7 +19,7 @@ public class ConversionController {
     private final ConversionService conversionService;
 
     @PostMapping("/mt-to-mx")
-    public ResponseEntity<Map<String, String>> convertMtToMx(@RequestBody Map<String, String> request) {
+    public ResponseEntity<Map<String, Object>> convertMtToMx(@RequestBody Map<String, String> request) {
         try {
             String mtContent = request.get("mtMessage");
             if (mtContent == null || mtContent.trim().isEmpty()) {
@@ -29,7 +29,8 @@ public class ConversionController {
             String messageType = request.get("messageType");
 
             String mxXml = conversionService.convertMtToMx(mtContent, messageType);
-            return ResponseEntity.ok(Map.of("xml", mxXml));
+            var mappings = conversionService.getMtToMxMappings(mtContent, mxXml);
+            return ResponseEntity.ok(Map.of("xml", mxXml, "mappings", mappings));
         } catch (RuntimeException e) {
             if ("ANONYMOUS_LIMIT_REACHED".equals(e.getMessage())) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -56,7 +57,7 @@ public class ConversionController {
     }
 
     @PostMapping("/mx-to-mt")
-    public ResponseEntity<Map<String, String>> convertMxToMt(@RequestBody Map<String, String> request) {
+    public ResponseEntity<Map<String, Object>> convertMxToMt(@RequestBody Map<String, String> request) {
         try {
             String mxContent = request.get("mxMessage");
             if (mxContent == null || mxContent.trim().isEmpty()) {
@@ -66,7 +67,8 @@ public class ConversionController {
             String messageType = request.get("messageType");
 
             String mtContent = conversionService.convertMxToMt(mxContent, messageType);
-            return ResponseEntity.ok(Map.of("mt", mtContent));
+            var mappings = conversionService.getMxToMtMappings(mxContent, mtContent);
+            return ResponseEntity.ok(Map.of("mt", mtContent, "mappings", mappings));
         } catch (RuntimeException e) {
             if ("ANONYMOUS_LIMIT_REACHED".equals(e.getMessage())) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)

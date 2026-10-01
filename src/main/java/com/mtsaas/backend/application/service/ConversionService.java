@@ -35,6 +35,7 @@ public class ConversionService {
     private final ConversionRepository conversionRepository;
     private final UserRepository userRepository;
     private final CreditService creditService;
+    private final com.mtsaas.backend.domain.swift.mapping.FieldMappingService fieldMappingService;
 
     private String getClientIp() {
         try {
@@ -300,6 +301,25 @@ public class ConversionService {
             result.put("errors", java.util.List.of("Syntax error parsing SWIFT FIN structure: " + e.getMessage()));
             result.put("detectedTags", java.util.Collections.emptyMap());
             return result;
+        }
+    }
+
+    public List<com.mtsaas.backend.domain.swift.mapping.FieldMappingResult> getMtToMxMappings(String mtContent, String mxXml) {
+        try {
+            var mtMessage = mtParser.parse(mtContent);
+            return fieldMappingService.generateMappingsForMtToMx(mtMessage, mxXml);
+        } catch (Exception e) {
+            log.warn("Error generating MT to MX mappings: {}", e.getMessage());
+            return java.util.Collections.emptyList();
+        }
+    }
+
+    public List<com.mtsaas.backend.domain.swift.mapping.FieldMappingResult> getMxToMtMappings(String mxXml, String mtContent) {
+        try {
+            return fieldMappingService.generateMappingsForMxToMt(mxXml, mtContent);
+        } catch (Exception e) {
+            log.warn("Error generating MX to MT mappings: {}", e.getMessage());
+            return java.util.Collections.emptyList();
         }
     }
 }

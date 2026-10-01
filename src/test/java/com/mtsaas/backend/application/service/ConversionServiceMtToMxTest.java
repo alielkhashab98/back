@@ -76,7 +76,8 @@ class ConversionServiceMtToMxTest {
                 List.of(),
                 conversionRepository,
                 userRepository,
-                creditService);
+                creditService,
+                new com.mtsaas.backend.domain.swift.mapping.FieldMappingService(new com.mtsaas.backend.domain.swift.mapping.FieldMappingRegistry()));
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRemoteAddr("203.0.113.25");
