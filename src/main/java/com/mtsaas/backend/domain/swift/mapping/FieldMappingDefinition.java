@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 public class FieldMappingDefinition {
     private String tag;             // Tag identifier (e.g., "20", "32A", "50K")
     private String name;            // Human readable field name
+    private String sourceType;      // e.g. "Option A (Date/Ccy/Amt)", "Option K (Unstructured)", "Header"
     private String defaultMxPath;   // Target ISO element path
     private String explanation;     // Reusable transformation explanation
     private String defaultWarning;  // Lossy/ambiguous warning if applicable
